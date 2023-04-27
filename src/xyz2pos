@@ -1,0 +1,189 @@
+#!/bin/csh -f
+umask 2
+set echo_style=both
+set vargs=()
+set pvdir=`awk 'BEGIN{pvd="/home/Tools/src/vasp"}tolower($1)=="potvaspdir"{pvd=$2}END{print pvd}' $mgtools/vasp/PTYPES.def`
+set psel=`awk 'tolower($1)=="defptype"{print $2}' $mgtools/vasp/PTYPES.def`
+set defpot=(`awk 'tolower($1)=="ptype"{print $2}' $mgtools/vasp/PTYPES.def`)
+set ptypeschdef=(`awk 'tolower($1)=="ptype"{print $3}' $mgtools/vasp/PTYPES.def`)
+# echo "\! ongoing reconstruction \!"
+set usage="Synopsis: xyz2pos XYZFILE [ OPTIONS ] \n--- generates POSCAR and POTCAR from directory $pvdir"
+set chem=$mgtools/INFO/CHTAB
+set fname=
+set sca="1.0"
+set pask=
+set pchfile=
+# try to locate alloy home (alloydir.def)
+set isaldef=
+set curdir=`pwd`
+set dum=$curdir
+while ( "$dum" != "/" && $isaldef != 1 )
+#    echo "DIR $dum"
+    if(! -f alloydir.def) then
+	cd ../
+	set dum=`pwd`
+    else
+	set isaldef=1
+    endif
+end
+set encut=
+if($isaldef == 1) then
+#    echo "alloydir.def"
+    set psel=`awk 'tolower($1)=="ptype"{print $2}' alloydir.def`
+    set encut=`awk 'tolower($1)=="encut"{print $2}' alloydir.def`
+#    echo $psel
+endif
+if($encut != "") then
+   set argv=($argv "-encut" $encut)
+endif
+if(-f pchoice.def) then
+    set pchfile=$dum/pchoice.def
+endif
+cd $curdir
+while ( "$*" != "" )
+    switch ( $1 )
+	case -h: #-h : this screen
+	    echo $usage
+	    echo "_______ OPTION DETAILS : "
+	    $mgtools/shbin/lsopt $0 | sort | fold -s
+	    echo "_______ svasp OPTIONS : "
+	    $mgtools/shbin/svasp -h
+	    exit
+	breaksw
+	case -sca: #-sca SCA : uniform scaling factor (written to POSCAR)
+	    shift
+	    set sca=$1
+	breaksw
+	case -pch: #-pch PCHOICEFILE : use file PCHOICEFILE instead of default pchoice.def defined in PTYPES.def (col 3)
+	    shift
+	    set pchfile=$1
+	breaksw
+	case -pa: #-pa : ask about potential choices whenever available
+	    set pask=1
+#	    goto ppdef
+	breaksw
+	case -p:
+	    goto ptype
+	breaksw
+	case -ptype: #-ptype PNAME : select valid potential directory name for a potential
+ptype:
+ppdef:
+	    shift
+	    set psel=$1
+	    if !(-d $pvdir/$psel) then
+		echo "VASP potential directory $pvdir/$psel does not exist"
+		echo "Available : $defpot"
+		exit
+	    endif
+	breaksw
+	default:
+	    if ( -f $1 ) then
+		set fname=$1
+	    else
+		set vargs=("$vargs" "$1")
+	    endif
+	breaksw
+    endsw
+    shift
+end
+############## PREPARE POSCAR
+if (-f POSCAR) then
+    mv POSCAR POSCAR~
+endif
+awk -f $mgtools/vatools/xyz2pos.awk -v chemfile=$mgtools/INFO/CHTAB -v sca=$sca $fname > POSCAR
+# get default choices of potentials
+if($pchfile == "") then
+    set pchfile=`cat $mgtools/vasp/PTYPES.def|awk 'BEGIN{p=ARGV[1];ARGV[1]="-"}tolower($1)=="ptype"&&$2==p&&$3!=""{print $3}' $psel`
+endif
+if ($fname == "") then
+    echo "Undefined XYZ filename "
+    echo $usage
+    exit
+endif
+set name=`echo $fname | awk -F\/ '{for(i=NF-1;i<=NF;i++){if(i>0){name=name$i;if(i<NF){name=name"/"}}}}END{print name}'`
+set potcar="potcar.tmp"
+echo -n "" > $potcar
+# check the potential dir exists
+if !(-d $pvdir/$psel) then
+    echo "Invalid vasp potential dir. Use one of:"
+    echo $defpot
+    exit
+endif
+### get specie names from already existing POSCAR, line 6
+set chsel=(`awk 'FNR==6{print $0}' POSCAR`)
+foreach ss ($chsel)
+    set defcho=
+    if(-f $pchfile ) then
+	set defcho=`awk 'BEGIN{def=ARGV[2];ARGC--}tolower($1)==tolower(def){pch=$2}END{print pch}' $pchfile $ss`
+    endif
+#    echo "adding  ss=$ss psel=$psel" 
+    set choo=`cat $mgtools/vasp/ptypes.db|awk 'BEGIN{ch=tolower(ARGV[1]); p=ARGV[2]; ARGC--; ARGV[1]="-"}tolower($1)==ch&&$2==p{print $3}' $ss $psel`
+    if( "$choo" == "" ) then
+	echo "Element $ss potential $psel : NOT AVAILABLE!"
+        exit
+    endif
+    if($#choo > 1 && $pask == 1) then # ASK TO CHOOSE
+	echo -n "choose $choo (1-$#choo) : "
+	set mch=$<
+	if($mch<1 || $mch>$#choo) then
+	    echo "... bad choice."
+	    exit
+	else
+	    set ss=$choo[$mch]
+	endif
+    else # take default, or just first...
+	if ($defcho == "" ) then
+	    set mss=
+	    foreach j ($choo)
+		set chtp=`echo $j | awk '{sub(/_/," ");print $0}'`
+		if($#chtp == 1) then
+		    set mss=$j
+		endif
+	    end
+	    if($mss == "") then
+		set ss=$choo[1]
+	    else
+		set ss=$mss
+	    endif
+	else
+	    set ss=$defcho
+	endif
+    endif
+    set ppath=$pvdir/$psel/$ss
+    if !(-d $ppath) then
+	echo "Element $ss : directory $ppath does not exist"
+	exit
+    endif
+    if (-f "$ppath/POTCAR") then
+	cat $ppath/POTCAR >> $potcar
+    else if (-f "$ppath/POTCAR.Z") then
+	zcat $ppath/POTCAR.Z >> $potcar
+    else
+	echo "Neither POTCAR nor POTCAR.Z exist in $ppath"
+	exit
+    endif
+end
+if (-f POTCAR) then
+    mv POTCAR POTCAR~
+#    echo -n "(POTCAR->POTCAR~) "
+endif
+mv $potcar POTCAR
+set nat=`cat $fname | awk 'FNR==4{print $1;exit}'`
+set sysname=`cat $fname |$mgtools/shbin/xyzi | sort | $mgtools/shbin/sysname`
+set mixvac=`cat $fname |$mgtools/shbin/xyzi -sl|awk 'r{nm[$1]++;split($3,a,"/");na[$1]+=a[1];nda[$1]=a[2]}$1=="rho"{r=1}END{for(i in nm){if(na[i]<nda[i]){vac="VAC"};if(nm[i]>1){mix="MIX"}};print mix,vac}'`
+set sdist=`cat $fname |$mgtools/shbin/xyzi -ordf | awk 'FNR==1{print $1;exit}'`
+echo "$sysname : $psel $chsel ; $mixvac R_min=$sdist"
+# setup INCAR and KPOINTS
+set sys="-system $sysname"
+set lreal="-lreal A"
+if($nat < 10) set lreal="-lreal F"
+set vargs=("$lreal" "$sys" "-kgen" "-kprec medium" "$vargs")
+cp $mgtools/vasp/KPOINTS.def KPOINTS
+$mgtools/shbin/svasp $vargs
+# add FLAGS file
+if(-f $mgtools/vasp/FLAGS) then
+    cp $mgtools/vasp/FLAGS .
+    touch FLAGS
+    chmod a+w FLAGS
+endif
+##

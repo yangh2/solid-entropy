@@ -1,0 +1,72 @@
+#!/usr/bin/awk -f
+BEGIN{
+  nn=0;
+  shift=0;
+  f=ENVIRON["mgtools"]"/INFO/CHTAB"; # chemistry
+  while (getline<f){
+    ch[$4]=$1;
+  }close(f);
+}
+FNR==1{ 
+# this is a string like "Fe70B20Zr10". Replace numbers by spaces and split
+# to get names of elements.
+#  struc=$1;
+#  gsub(/[0-9]+/," ",$1);
+#  nch0=split($1,ch2);
+}
+# if negative VOLUME
+FNR==2{if($1<0){sca=(-$1)^(1/3)}else{sca=$1}}
+FNR>=3&&FNR<=5{
+  i=FNR-2;
+  b[i,1]=sprintf("%1.8f",$1*sca);
+  b[i,2]=sprintf("%1.8f",$2*sca);
+  b[i,3]=sprintf("%1.8f",$3*sca);
+}
+FNR==6{
+  for(i=1;i<=NF;i++){
+    chs[i]=$i;
+    chem[i]=ch[$i];
+  }
+  nch=NF;
+  getline;
+#  print "LINE 7 "$0" nch="nch;
+  for(i=1;i<=nch;i++){
+    nn+=$i; nsp[i]=$i;
+  }
+}
+# the two following lines are OPTIONAL in POSCAR
+(match($0,/Sel/)){shift++};
+(match($0,/Dir/)){shift++};
+FNR>(7+shift)&&FNR<(8+shift+nn){
+  nat++;r[nat]=$1" "$2" "$3;
+#  print i,nat;
+}
+FNR>7+shift+nn{exit}
+END{
+  if(hexit){ # synopsis
+    print "Synopsis: pos2xyz POSCAR|CONTCAR [-p POTCARFILE]";
+    print " -- note: \"-p POTCARFILE\" may be omitted if POTCAR is in currentdir";
+    exit;
+  }
+#  print nat,"atoms";
+  for(i=1;i<=3;i++){
+    print b[i,1],b[i,2],b[i,3];
+  }
+  print nn,"atoms from "FILENAME;
+  for(j=1;j<=nch;j++){
+    if(j==1){n0=1}else{n0+=nsp[j-1];}
+    n1+=nsp[j];
+#    chem=ch[ch2[j]];
+    k=0;
+    for(i=n0;i<=n1;i++){
+      k++;
+      print r[i],chem[j],i,sch[j]k;
+#      print r[i],chem,i;
+    }
+  }
+#  print "struc="struc > "INFO";
+#  print "pears=?" >> "INFO";
+#  print "type=VASP" >> "INFO";
+#  system("cat XYZ | xyztool -info -ivol>>INFO");
+}
+

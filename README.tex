@@ -1,0 +1,355 @@
+% Created 2023-04-27 Thu 13:16
+% Intended LaTeX compiler: pdflatex
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{wrapfig}
+\usepackage{rotating}
+\usepackage[normalem]{ulem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{capt-of}
+\usepackage{hyperref}
+\author{Yang Huang}
+\date{\textit{<2023-01-18 Wed>}}
+\title{Vibrational Entropy of Crystalline Solids from Covariance of Atomic Displacements}
+\hypersetup{
+ pdfauthor={Yang Huang},
+ pdftitle={Vibrational Entropy of Crystalline Solids from Covariance of Atomic Displacements},
+ pdfkeywords={},
+ pdfsubject={},
+ pdfcreator={Emacs 25.2.2 (Org mode 9.2.3)}, 
+ pdflang={English}}
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+
+\section{Purpose}
+\label{sec:orgdec938a}
+This archive contains tools to calculate entropy from covariance matrix based
+on method describe in Huang, Y.; Widom, M. Vibrational Entropy of Crystalline
+Solids from Covariance of Atomic Displacements. Entropy 2022, 24, 618.
+\url{https://doi.org/10.3390/e24050618}.
+These tools are designed especially for output from MD simulation implemented
+in VASP. You are free to modify and redistribute the code for general purpose.
+
+\section{Contents}
+\label{sec:org6d808f0}
+Following list of files should be contained in the directory:
+\begin{itemize}
+\item README
+
+\item install.sh
+
+\item src
+
+Contain source files.
+
+\item example
+
+Contain examples
+
+\item bin
+
+Contain compiled binaries.
+\end{itemize}
+
+
+\section{Required packages}
+\label{sec:org87dc4ed}
+\begin{enumerate}
+\item GSL - GNU Scientific Library
+
+The GNU Scientific Library (GSL) is a numerical library for C and C++
+programmers. It is free software under the GNU General Public License. 
+It is installed on most linux systems. To install it, check \url{https://www.gnu.org/software/gsl/}.
+
+\item Aflow [optional]
+
+The aflow-sym.sh requires AFLOW codes in order to run properly. 
+To install it, check \url{http://aflow.org/install-aflow/}.
+
+\item pos2xyz and xyz2pos from euler
+
+The xdat-ent program is originally written on euler so that it utilizes certain
+mgtools on euler. Unfortunately the author is unwilling to modify
+these codes to make it more convenient for general users and you will have to
+ask for permissions to access these tools.
+
+The "pos2xyz" converts a POSCAR file to a XYZ file.
+The "xyz2pos" converts a XYZ file to a POSCAR file.
+\end{enumerate}
+
+\section{How to install}
+\label{sec:org8ee82fe}
+Go to the main directory and run "./install.sh". It will compile the source
+files and put binaries into the bin directory.
+
+After you run the command, you run the test script "./test.sh" in the examples directory.
+
+\section{List of tools}
+\label{sec:org1e91d21}
+[BEFORE YOU RUN]
+\begin{itemize}
+\item xdat-ent-init.sh
+
+\begin{itemize}
+\item Description
+
+Preparing "Trun" and "Mass" input files for "xdat-ent-rhoALL\_quantum\_mod"
+commands.
+
+\item Input:
+\begin{itemize}
+\item INCAR
+\item POTCAR
+\item /home/Tools/src/mgtools/INFO/CHTAB.
+\end{itemize}
+
+\item Usage:
+
+xdat-ent-init.sh
+*Only work on euler.
+
+\item Output:
+
+Generate "Trun" and "Mass".
+\end{itemize}
+
+\item aflow-sym.sh
+\begin{itemize}
+\item Description
+
+This script utilizes "aflow" tools to help find symmetry operations. It is recommended to
+run on a small cell for efficiency.
+
+\item Input:
+
+POSCAR or XYZ file.
+
+\item Usage:
+
+aflow-sym.sh [ -x <xyz file> ] [ -p <POSCAR file> ]
+
+\item Output:
+
+A "symmetry\_operation.dat " which contains number of operations N and N
+3x3 operation matrix in direction space.
+\end{itemize}
+\end{itemize}
+
+[WHEN YOU RUN]
+\begin{itemize}
+\item xdat-ent-rhoALL\_quantum\_mod tools
+
+\begin{itemize}
+\item Description
+
+\begin{itemize}
+\item xdat-ent-rhoALL\_quantum\_mod
+
+Pure element crystalline from NVT simulation
+
+\item xdat-ent-rhoALL\_quantum\_npt
+
+Pure element crystalline from NPT simulation
+
+\item xdat-ent-rhoALL\_quantum\_alloy
+
+Alloys from NVT simulation.
+\end{itemize}
+
+xdat-ent-rhoALL\_quantum\_mod has been tested to be robust while only a few
+examples have been performed with xdat-ent-rhoALL\_quantum\_npt and
+xdat-ent-rhoALL\_quantum\_alloy command. So be careful with these two
+commands!
+
+\item Input:
+
+"example" directory provides examples of input files.
+
+\begin{itemize}
+\item Trun
+
+This file contains in value which is the temperature of MD simulation.
+
+\item Mass
+
+This file contains three rows:
+\begin{enumerate}
+\item type of species.
+\item atomic numbers.
+\item atomic masses [a.u.] in atomic units.
+\end{enumerate}
+
+\item xyzfile
+
+This file contains the ideal structure of a crystal.
+The first three rows are lattice constants.
+The 4th row contains number of atoms N.
+The following N rows should obeys:
+dx,dy,dz,na \ldots{}
+where dx,dy,dz is directional vector and na is atomic number.
+
+\item symmetry-file
+
+This file contains symmetry operation matrices U.
+The first row is number of operations N and then it is followed by N 3x3
+matrices U each of which is a operation matrix in directional space (b'=Ub).
+
+\item XDATCAR
+
+Output from VASP MD simulations.
+\end{itemize}
+\end{itemize}
+\end{itemize}
+
+
+\begin{itemize}
+\item Usage:
+
+xdat-ent-rhoALL\_quantum\_mod -f xyzfile -s symmetry-file XDATCAR* > out
+
+\item Output:
+
+\begin{itemize}
+\item covariance\_pair.dat
+
+3x3 covariance matrices in real space of all symmetry distinguishing
+pairs.
+
+\item density\_matrix.dat
+
+See reference for more mathematical description.
+A 3Nx3N matrix.
+
+\item force\_matrix.dat
+
+See reference for more mathematical description.
+A 3Nx3N force matrix.
+
+\item Eigenvalues.dat
+
+A 3Nx2 matrix.
+The first row are eigenvalues of density matrix.
+The second row are frequencies (hbar*omega [eV]) of eigen modes
+See reference for mathematical relation.
+
+\item "out":
+
+The last line of "out" reports calculated entropy with S\_classic
+(classical entropy) and S\_quantum (quantum entropy)
+\end{itemize}
+\end{itemize}
+
+[AFTER YOU RUN] 
+\begin{itemize}
+\item freq2quan.py
+
+\begin{itemize}
+\item Description
+
+Calculate free energy F[eV/at], internal energy U [eV/at], entropy S [kB/at] 
+and heat capacity Cv [kB/at] from Eigenvalues.dat
+
+\item Input: "Trun", "Eigenvalues.dat"
+
+\item Usage: freq2quan.py
+
+\item Output: calculated quantities.
+\end{itemize}
+
+\item force2dos
+
+\begin{itemize}
+\item Description
+
+Calculate free energy F[eV/at], internal energy U [eV/at], entropy S [kB/at] 
+and heat capacity Cv [kB/at] from Eigenvalues.dat
+
+\item Input: 
+
+\begin{itemize}
+\item "Trun", "force\_matrix.dat", xyzfile
+
+\item KDim (an integer indicate kmesh KDimxKDimxKdim).
+
+\item recip\_vectors of a primitive cell
+
+3x3 matrix
+\end{itemize}
+
+\item Usage: 
+
+force2dos xyzfile KDim > out;
+
+\item Output: 
+
+In "out" file, there are two columns of datas.
+The first column is hbar*omega [meV].
+The second one is vibrational DOS [states/atom/meV].
+\end{itemize}
+
+\item force2band
+
+\begin{itemize}
+\item Description
+
+Calculate free energy F[eV/at], internal energy U [eV/at], entropy S [kB/at] 
+and heat capacity Cv [kB/at] from Eigenvalues.dat
+
+\item Input: 
+
+\begin{itemize}
+\item "Trun", "force\_matrix.dat", xyzfile
+
+\item KDim (an integer indicate kmesh KDimxKDimxKdim).
+
+\item recip\_vectors of a primitive cell
+
+3x3 matrix
+
+\item kpath
+\end{itemize}
+
+\item Usage: 
+
+force2band xyzfile > out;
+
+\item Output: 
+
+Eigenvalues along kpath.
+\end{itemize}
+\end{itemize}
+
+\section{Pay attention to}
+\label{sec:org8888f66}
+
+\begin{itemize}
+\item symmetry operations:
+
+Symmetry operations will greatly improve precision of calculated entropy
+for a short run at a cost of calculation time. With symmetry operation
+turned on, each configuration will be process N times where N is the number
+of operations.
+
+This program is known to give incorrect results when applied to low-symmetry super
+cell from a highly symmetrical crystalline structure, e.g. a 5x5x5 primitive
+cell of BCC Li. Hence, it is recommended to run simulation at its
+high-symmetry unit cell. e.g. a super cell of a 2-atom BCC unit cell or a 4-atom FCC
+unit cell.
+
+\item Eigenvalues.dat:
+
+A reasonable calculation should give 3 zero eigenvalues in the first column
+in Eigenvalues.dat and correspondingly 3 nan or large number in the second
+column. So be careful with zero or nan values in Eigenvalues.dat.
+
+Imaginary modes may show up which are denoted as negative eigenvalues. As
+long as there are 3 zero eigenvalues, we think the program is doing its job.
+\end{itemize}
+\end{document}
